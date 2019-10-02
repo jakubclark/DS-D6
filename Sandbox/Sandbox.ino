@@ -17,8 +17,8 @@
 #define wdt_reset() NRF_WDT->RR[0] = WDT_RR_RR_Reload
 #define wdt_enable(timeout)                                                    \
   NRF_WDT->CONFIG = NRF_WDT->CONFIG =                                          \
-      (WDT_CONFIG_HALT_Pause << WDT_CONFIG_HALT_Pos) |                         \
-      (WDT_CONFIG_SLEEP_Pause << WDT_CONFIG_SLEEP_Pos);                        \
+                    (WDT_CONFIG_HALT_Pause << WDT_CONFIG_HALT_Pos) |                         \
+                    (WDT_CONFIG_SLEEP_Pause << WDT_CONFIG_SLEEP_Pos);                        \
   NRF_WDT->CRV = (32768 * timeout) / 1000;                                     \
   NRF_WDT->RREN |= WDT_RREN_RR0_Msk;                                           \
   NRF_WDT->TASKS_START = 1
@@ -29,7 +29,9 @@
 #define TIME_INDEX 0
 #define MAC_INDEX 1
 #define SANDBOX_INDEX 2
-#define BOOTLOADER_INDEX 3
+#define SNOWFLAKE_INDEX 3
+#define SNOWFLAKE_ANIMATION_INDEX 4
+#define BOOTLOADER_INDEX 5
 /* The watch has moved */
 #define ACCELEROMETER_INDEX 77
 /* The watch is charging */
@@ -69,12 +71,12 @@ BLEPeripheral blePeripheral = BLEPeripheral();
 BLEService batteryLevelService = BLEService("190A");
 BLECharacteristic TXchar = BLECharacteristic("0002", BLENotify, 20);
 BLECharacteristic RXchar =
-    BLECharacteristic("0001", BLEWriteWithoutResponse, 20);
+  BLECharacteristic("0001", BLEWriteWithoutResponse, 20);
 
 BLEService batteryLevelService1 = BLEService("190B");
 BLECharacteristic TXchar1 = BLECharacteristic("0004", BLENotify, 20);
 BLECharacteristic RXchar1 =
-    BLECharacteristic("0003", BLEWriteWithoutResponse, 20);
+  BLECharacteristic("0003", BLEWriteWithoutResponse, 20);
 
 #define N_GRAINS 250 // Number of grains of sand
 #define WIDTH 127    // Display width in pixels
@@ -170,11 +172,15 @@ void charge() {
 }
 
 /* Check if no action was taken in the last `delay` milliseconds */
-bool shouldSleep(int delay) { return (millis() - sleepTime) > sleepDelay; }
+bool shouldSleep(int delay) {
+  return (millis() - sleepTime) > delay;
+}
 
 /* Check if the display should be refreshed, based on the time of the last
- * refresh */
-bool shouldRefresh() { return (millis() - displayRefreshTime) > refreshRate; }
+   refresh */
+bool shouldRefresh() {
+  return (millis() - displayRefreshTime) > refreshRate;
+}
 
 /* Callback for when the button is pressed */
 void buttonCallback() {
@@ -386,7 +392,7 @@ void handlePush(String pushMSG) {
   int lastCommaIndex = pushMSG.indexOf(',', secondCommaIndex + 1);
   String MsgText = pushMSG.substring(commaIndex + 1, secondCommaIndex);
   int timeShown =
-      pushMSG.substring(secondCommaIndex + 1, lastCommaIndex).toInt();
+    pushMSG.substring(secondCommaIndex + 1, lastCommaIndex).toInt();
   int SymbolNr = pushMSG.substring(lastCommaIndex + 1).toInt();
   msgText = MsgText;
   if (debug)
@@ -395,7 +401,9 @@ void handlePush(String pushMSG) {
     Serial.println("symbol: " + String(SymbolNr));
 }
 
-int getBatteryLevel() { return map(analogRead(3), 500, 715, 0, 100); }
+int getBatteryLevel() {
+  return map(analogRead(3), 500, 715, 0, 100);
+}
 
 void setup() {
   pinMode(BUTTON_PIN, INPUT);
@@ -436,11 +444,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(15), acclHandler, RISING);
   NRF_GPIO->PIN_CNF[15] &= ~((uint32_t)GPIO_PIN_CNF_SENSE_Msk);
   NRF_GPIO->PIN_CNF[15] |=
-      ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+    ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
   attachInterrupt(digitalPinToInterrupt(2), charge, RISING);
   NRF_GPIO->PIN_CNF[2] &= ~((uint32_t)GPIO_PIN_CNF_SENSE_Msk);
   NRF_GPIO->PIN_CNF[2] |=
-      ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+    ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
   display.begin(SSD1306_SWITCHCAPVCC);
   delay(100);
   display.clearDisplay();
@@ -472,6 +480,8 @@ void setup() {
     grain[i].pos = (grain[i].y / 256) * WIDTH + (grain[i].x / 256);
     grain[i].vx = grain[i].vy = 0; // Initial velocity is zero
   }
+
+  initSnowflakes();
 }
 
 /* Do some action, based on the current value of `menuIndex` */
@@ -482,93 +492,113 @@ void doAction() {
   else if (shouldRefresh()) {
     displayRefreshTime = millis();
     switch (menuIndex) {
-    case TIME_INDEX:
-    case ACCELEROMETER_INDEX:
-      displayTime();
-      break;
-    case MAC_INDEX:
-      displayMAC();
-      break;
-    case BOOTLOADER_INDEX:
-      displayBootloader();
-      break;
-    case CHARGING_INDEX:
-      displayCharging();
-      break;
-    case BLE_RECEIVED_INDEX:
-      displayBleMenu();
-      break;
+      case TIME_INDEX:
+      case ACCELEROMETER_INDEX:
+        displayTime();
+        break;
+      case MAC_INDEX:
+        displayMAC();
+        break;
+      case SNOWFLAKE_INDEX:
+        displaySnowflakeStatic();
+        break;
+      case SNOWFLAKE_ANIMATION_INDEX:
+        displaySnowflakeAnimation();
+        break;
+      case BOOTLOADER_INDEX:
+        displayBootloader();
+        break;
+      case CHARGING_INDEX:
+        displayCharging();
+        break;
+      case BLE_RECEIVED_INDEX:
+        displayBleMenu();
+        break;
     }
   }
 }
 
 /**
- * Handler for when the button is pressed.
- * This is different than `buttonCallback()`, which handles the IRQ.
+   Handler for when the button is pressed.
+   This is different than `buttonCallback()`, which handles the IRQ.
  * */
 void handleButtonPress() {
   buttonPressed = false;
   switch (menuIndex) {
-  case BOOTLOADER_INDEX:
-    startbutton = millis();
-    while (!digitalRead(BUTTON_PIN)) {
-    }
-    if (millis() - startbutton > 1000) {
-      delay(100);
-      int err_code = sd_power_gpregret_set(0x01);
-      sd_nvic_SystemReset();
-      while (1) {
-      };
-    } else {
+    case BOOTLOADER_INDEX:
+      startbutton = millis();
+      while (!digitalRead(BUTTON_PIN)) {
+      }
+      if (millis() - startbutton > 1000) {
+        delay(100);
+        int err_code = sd_power_gpregret_set(0x01);
+        sd_nvic_SystemReset();
+        while (1) {
+        };
+      } else {
+        menuIndex = 0;
+      }
+      break;
+    case ACCELEROMETER_INDEX:
+    case CHARGING_INDEX:
+    case BLE_RECEIVED_INDEX:
       menuIndex = 0;
-    }
-    break;
-  case ACCELEROMETER_INDEX:
-  case CHARGING_INDEX:
-  case BLE_RECEIVED_INDEX:
-    menuIndex = 0;
-    break;
-  default:
-    menuIndex += 1;
+      motorOff();
+      break;
+    default:
+      menuIndex += 1;
   }
 }
 
 /* If enough time has passed, power off the display, based on the value of
- * `menuIndex`. */
+   `menuIndex`. */
 void powerDownIfNeeded() {
   switch (menuIndex) {
-  case TIME_INDEX:
-  case MAC_INDEX:
-    if (shouldSleep(sleepDelay)) {
-      powerDown();
-    }
-    break;
-  case SANDBOX_INDEX:
-    if (shouldSleep(20000)) {
-      powerDown();
-    }
-    break;
-  case ACCELEROMETER_INDEX:
-  case CHARGING_INDEX:
-    if (shouldSleep(5000))
-      powerDown();
-    break;
-  case BLE_RECEIVED_INDEX:
-    if (shouldSleep(5000)) {
-      motorOff();
-      powerDown();
-    }
-    break;
+    case TIME_INDEX:
+    case MAC_INDEX:
+      if (shouldSleep(sleepDelay)) {
+        powerDown();
+      }
+      break;
+    case SNOWFLAKE_INDEX:
+    case SNOWFLAKE_ANIMATION_INDEX:
+      if (shouldSleep(10000)) {
+        powerDown();
+      }
+      break;
+    case SANDBOX_INDEX:
+      if (shouldSleep(20000)) {
+        powerDown();
+      }
+      break;
+    case ACCELEROMETER_INDEX:
+    case CHARGING_INDEX:
+      if (shouldSleep(5000))
+        powerDown();
+      break;
+    case BLE_RECEIVED_INDEX:
+      if (shouldSleep(500)) {
+        motorOff();
+      }
+      if (shouldSleep(5000)) {
+        powerDown();
+      }
+      break;
+    default:
+      if (shouldSleep(5000)) {
+        motorOff();
+        powerDown();
+      }
   }
 }
 
 /**
- * Generally, the loop contains 3 parts:
- * 1. Take an action based on the current state.
- * 2. Increment the menu index, if the button is pressed
- * 3. Turn off the display, if enough time has passed since the last
- *event/action If the device is in `sleeping` mode (i.e.: no action has been
- *taken), wait for the next IRQ.
+   Generally, the loop contains 3 parts:
+   1. Take an action based on the current state.
+   2. Increment the menu index, if the button is pressed
+   3. Turn off the display, if enough time has passed since the last
+  event/action If the device is in `sleeping` mode (i.e.: no action has been
+  taken), wait for the next IRQ.
  **/
 void loop() {
   blePeripheral.poll();
@@ -637,143 +667,6 @@ void displayMAC() {
   sprintf(tmp, "%08X", NRF_FICR->DEVICEADDR[0]);
   MyID += tmp;
   display.println(MyID);
-  display.display();
-}
-
-/* Sample sandbox game, with grains reacting to gravity */
-void displaySandboxGame() {
-  uint32_t t;
-  while (((t = micros()) - prevTime) < (1000000L / MAX_FPS))
-    ;
-  prevTime = t;
-
-  uint8_t res[6];
-  softbeginTransmission(0x1F);
-  softwrite(0x06);
-  softendTransmission();
-  softrequestFrom(0x1F, 6);
-  res[0] = softread();
-  res[1] = softread();
-  res[2] = softread();
-  res[3] = softread();
-  res[4] = softread();
-  res[5] = softread();
-  int x = (int16_t)((res[1] << 8) | res[0]);
-  int y = (int16_t)((res[3] << 8) | res[2]);
-  int z = (int16_t)((res[5] << 8) | res[4]);
-
-  float accelX = y;
-  float accelY = -x;
-  float accelZ = z;
-  int16_t ax = -accelY / 256,  // Transform accelerometer axes
-      ay = accelX / 256,       // to grain coordinate space
-      az = abs(accelZ) / 2048; // Random motion factor
-  az = (az >= 3) ? 1 : 4 - az; // Clip & invert
-  ax -= az;                    // Subtract motion factor from X, Y
-  ay -= az;
-  int16_t az2 = az * 2 + 1; // Range of random motion to add back in
-
-  int32_t v2; // Velocity squared
-  float v;    // Absolute velocity
-  for (int i = 0; i < N_GRAINS; i++) {
-    grain[i].vx += ax + random(az2); // A little randomness makes
-    grain[i].vy += ay + random(az2); // tall stacks topple better!
-    v2 =
-        (int32_t)grain[i].vx * grain[i].vx + (int32_t)grain[i].vy * grain[i].vy;
-    if (v2 > 65536) {      // If v^2 > 65536, then v > 256
-      v = sqrt((float)v2); // Velocity vector magnitude
-      grain[i].vx = (int)(256.0 * (float)grain[i].vx / v); // Maintain heading
-      grain[i].vy = (int)(256.0 * (float)grain[i].vy / v); // Limit magnitude
-    }
-  }
-
-  uint16_t i, bytes, oldidx, newidx, delta;
-  int16_t newx, newy;
-
-  for (i = 0; i < N_GRAINS; i++) {
-    newx = grain[i].x + grain[i].vx; // New position in grain space
-    newy = grain[i].y + grain[i].vy;
-    if (newx > MAX_X) {  // If grain would go out of bounds
-      newx = MAX_X;      // keep it inside, and
-      grain[i].vx /= -2; // give a slight bounce off the wall
-    } else if (newx < 0) {
-      newx = 0;
-      grain[i].vx /= -2;
-    }
-    if (newy > MAX_Y) {
-      newy = MAX_Y;
-      grain[i].vy /= -2;
-    } else if (newy < 0) {
-      newy = 0;
-      grain[i].vy /= -2;
-    }
-
-    oldidx = (grain[i].y / 256) * WIDTH + (grain[i].x / 256); // Prior pixel #
-    newidx = (newy / 256) * WIDTH + (newx / 256);             // New pixel #
-    if ((oldidx != newidx) &&       // If grain is moving to a new pixel...
-        img[newidx]) {              // but if that pixel is already occupied...
-      delta = abs(newidx - oldidx); // What direction when blocked?
-      if (delta == 1) {             // 1 pixel left or right)
-        newx = grain[i].x;          // Cancel X motion
-        grain[i].vx /= -2;          // and bounce X velocity (Y is OK)
-        newidx = oldidx;            // No pixel change
-      } else if (delta == WIDTH) {  // 1 pixel up or down
-        newy = grain[i].y;          // Cancel Y motion
-        grain[i].vy /= -2;          // and bounce Y velocity (X is OK)
-        newidx = oldidx;            // No pixel change
-      } else {                      // Diagonal intersection is more tricky...
-        if ((abs(grain[i].vx) - abs(grain[i].vy)) >= 0) { // X axis is faster
-          newidx = (grain[i].y / 256) * WIDTH + (newx / 256);
-          if (!img[newidx]) {  // That pixel's free!  Take it!  But...
-            newy = grain[i].y; // Cancel Y motion
-            grain[i].vy /= -2; // and bounce Y velocity
-          } else {             // X pixel is taken, so try Y...
-            newidx = (newy / 256) * WIDTH + (grain[i].x / 256);
-            if (!img[newidx]) {  // Pixel is free, take it, but first...
-              newx = grain[i].x; // Cancel X motion
-              grain[i].vx /= -2; // and bounce X velocity
-            } else {             // Both spots are occupied
-              newx = grain[i].x; // Cancel X & Y motion
-              newy = grain[i].y;
-              grain[i].vx /= -2; // Bounce X & Y velocity
-              grain[i].vy /= -2;
-              newidx = oldidx; // Not moving
-            }
-          }
-        } else { // Y axis is faster, start there
-          newidx = (newy / 256) * WIDTH + (grain[i].x / 256);
-          if (!img[newidx]) {  // Pixel's free!  Take it!  But...
-            newx = grain[i].x; // Cancel X motion
-            grain[i].vy /= -2; // and bounce X velocity
-          } else {             // Y pixel is taken, so try X...
-            newidx = (grain[i].y / 256) * WIDTH + (newx / 256);
-            if (!img[newidx]) {  // Pixel is free, take it, but first...
-              newy = grain[i].y; // Cancel Y motion
-              grain[i].vy /= -2; // and bounce Y velocity
-            } else {             // Both spots are occupied
-              newx = grain[i].x; // Cancel X & Y motion
-              newy = grain[i].y;
-              grain[i].vx /= -2; // Bounce X & Y velocity
-              grain[i].vy /= -2;
-              newidx = oldidx; // Not moving
-            }
-          }
-        }
-      }
-    }
-    grain[i].x = newx; // Update grain position
-    grain[i].y = newy;
-    img[oldidx] = 0;   // Clear old spot (might be same as new, that's OK)
-    img[newidx] = 255; // Set new spot
-    grain[i].pos = newidx;
-  }
-
-  display.clearDisplay();
-  for (i = 0; i < N_GRAINS; i++) {
-    int yPos = grain[i].pos / WIDTH;
-    int xPos = grain[i].pos % WIDTH;
-    display.drawPixel(xPos, yPos, WHITE);
-  }
   display.display();
 }
 
