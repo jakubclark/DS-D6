@@ -11,7 +11,7 @@ static const unsigned char PROGMEM logo_bmp[] = {
   B01110000, B01110000, B00000000, B00110000
 };
 
-void displaySnowflakeStatic() {
+void displaySnowflakesStatic() {
   display.clearDisplay();
   display.drawBitmap((display.width() - LOGO_WIDTH) / 2,
                      (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH,
@@ -37,27 +37,21 @@ void initSnowflakes() {
 
 void displaySnowflakeAnimation() {
   int8_t f;
-  for (int i = 0; i < 32; i++) {
-    display.clearDisplay();
+  display.clearDisplay();
 
-    // Draw each snowflake:
-    for (f = 0; f < NUMFLAKES; f++) {
-      display.drawBitmap(icons[f][XPOS], icons[f][YPOS], logo_bmp, LOGO_WIDTH,
-                         LOGO_HEIGHT, WHITE);
-    }
+  for (f = 0; f < NUMFLAKES; f++) {
+    display.drawBitmap(icons[f][XPOS], icons[f][YPOS], logo_bmp, LOGO_WIDTH,
+                        LOGO_HEIGHT, WHITE);
+  }
 
-    display.display();
-    delay(10);
-    // Then update coordinates of each flake...
-    for (f = 0; f < NUMFLAKES; f++) {
-      icons[f][YPOS] += icons[f][DELTAY];
-      // If snowflake is off the bottom of the screen...
-      if (icons[f][YPOS] >= display.height()) {
-        // Reinitialize to a random position, just off the top
-        icons[f][XPOS] = random(1 - LOGO_WIDTH, display.width());
-        icons[f][YPOS] = -LOGO_HEIGHT;
-        icons[f][DELTAY] = random(1, 3);
-      }
+  display.display();
+  delay(10);
+  for (f = 0; f < NUMFLAKES; f++) {
+    icons[f][YPOS] += icons[f][DELTAY];
+    if (icons[f][YPOS] >= display.height()) {
+      icons[f][XPOS] = random(1 - LOGO_WIDTH, display.width());
+      icons[f][YPOS] = -LOGO_HEIGHT;
+      icons[f][DELTAY] = random(1, 3);
     }
   }
 }

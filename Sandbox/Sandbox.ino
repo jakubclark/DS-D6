@@ -17,8 +17,8 @@
 #define wdt_reset() NRF_WDT->RR[0] = WDT_RR_RR_Reload
 #define wdt_enable(timeout)                                                    \
   NRF_WDT->CONFIG = NRF_WDT->CONFIG =                                          \
-                    (WDT_CONFIG_HALT_Pause << WDT_CONFIG_HALT_Pos) |                         \
-                    (WDT_CONFIG_SLEEP_Pause << WDT_CONFIG_SLEEP_Pos);                        \
+      (WDT_CONFIG_HALT_Pause << WDT_CONFIG_HALT_Pos) |                         \
+      (WDT_CONFIG_SLEEP_Pause << WDT_CONFIG_SLEEP_Pos);                        \
   NRF_WDT->CRV = (32768 * timeout) / 1000;                                     \
   NRF_WDT->RREN |= WDT_RREN_RR0_Msk;                                           \
   NRF_WDT->TASKS_START = 1
@@ -40,8 +40,6 @@
 #define BLE_RECEIVED_INDEX 99
 
 Adafruit_SSD1306 display(128, 32, &SPI, 28, 4, 29);
-
-boolean debug = false;
 
 /* The display will power down after this many milliseconds */
 #define sleepDelay 7000
@@ -71,12 +69,12 @@ BLEPeripheral blePeripheral = BLEPeripheral();
 BLEService batteryLevelService = BLEService("190A");
 BLECharacteristic TXchar = BLECharacteristic("0002", BLENotify, 20);
 BLECharacteristic RXchar =
-  BLECharacteristic("0001", BLEWriteWithoutResponse, 20);
+    BLECharacteristic("0001", BLEWriteWithoutResponse, 20);
 
 BLEService batteryLevelService1 = BLEService("190B");
 BLECharacteristic TXchar1 = BLECharacteristic("0004", BLENotify, 20);
 BLECharacteristic RXchar1 =
-  BLECharacteristic("0003", BLEWriteWithoutResponse, 20);
+    BLECharacteristic("0003", BLEWriteWithoutResponse, 20);
 
 #define N_GRAINS 250 // Number of grains of sand
 #define WIDTH 127    // Display width in pixels
@@ -139,9 +137,6 @@ void powerUp() {
     display.begin(SSD1306_SWITCHCAPVCC);
     display.clearDisplay();
     display.display();
-    if (debug)
-      Serial.begin(115200);
-
     delay(5);
   }
   sleepTime = millis();
@@ -149,8 +144,6 @@ void powerUp() {
 
 void powerDown() {
   if (!sleeping) {
-    if (debug)
-      NRF_UART0->ENABLE = UART_ENABLE_ENABLE_Disabled;
     sleeping = true;
 
     digitalWrite(28, LOW);
@@ -172,15 +165,11 @@ void charge() {
 }
 
 /* Check if no action was taken in the last `delay` milliseconds */
-bool shouldSleep(int delay) {
-  return (millis() - sleepTime) > delay;
-}
+bool shouldSleep(int delay) { return (millis() - sleepTime) > delay; }
 
 /* Check if the display should be refreshed, based on the time of the last
    refresh */
-bool shouldRefresh() {
-  return (millis() - displayRefreshTime) > refreshRate;
-}
+bool shouldRefresh() { return (millis() - displayRefreshTime) > refreshRate; }
 
 /* Callback for when the button is pressed */
 void buttonCallback() {
@@ -201,8 +190,6 @@ void acclHandler() {
 
 /* Handler for when BLE has connected */
 void blePeripheralConnectHandler(BLECentral &central) {
-  if (debug)
-    Serial.println("BLEconnected");
   menuIndex = 0;
   powerUp();
   bleSymbol = "B";
@@ -210,8 +197,6 @@ void blePeripheralConnectHandler(BLECentral &central) {
 
 /* Handler for when BLE has disconnected */
 void blePeripheralDisconnectHandler(BLECentral &central) {
-  if (debug)
-    Serial.println("BLEdisconnected");
   menuIndex = 0;
   powerUp();
   bleSymbol = " ";
@@ -234,10 +219,6 @@ void characteristicWritten(BLECentral &central,
     answer = tempCmd.substring(0, tempLen - 2);
     tempCmd = "";
     tempLen = 0;
-    if (debug)
-      Serial.print("RxBle: ");
-    if (debug)
-      Serial.println(answer);
     handleBLECommand(answer);
   }
 }
@@ -344,10 +325,6 @@ void handleBLECommand(String cmd) {
 }
 
 void sendBLEcmd(String cmd) {
-  if (debug)
-    Serial.print("TxBle: ");
-  if (debug)
-    Serial.println(cmd);
   cmd = cmd + "\r\n";
   while (cmd.length() > 0) {
     const char *TempSendCmd;
@@ -386,24 +363,13 @@ void SetDateTimeString(String datetime) {
   setTime(hr, min, sec, day, month, year);
 }
 
-void handlePush(String pushMSG) {
-  int commaIndex = pushMSG.indexOf(',');
-  int secondCommaIndex = pushMSG.indexOf(',', commaIndex + 1);
-  int lastCommaIndex = pushMSG.indexOf(',', secondCommaIndex + 1);
-  String MsgText = pushMSG.substring(commaIndex + 1, secondCommaIndex);
-  int timeShown =
-    pushMSG.substring(secondCommaIndex + 1, lastCommaIndex).toInt();
-  int SymbolNr = pushMSG.substring(lastCommaIndex + 1).toInt();
-  msgText = MsgText;
-  if (debug)
-    Serial.println("MSGtext: " + msgText);
-  if (debug)
-    Serial.println("symbol: " + String(SymbolNr));
+void handlePush(String pushedMessage) {
+  int firstComma = pushedMessage.indexOf(',');
+  int secondComma = pushedMessage.indexOf(',', firstComma + 1);
+  msgText = pushedMessage.substring(firstComma + 1, secondComma);
 }
 
-int getBatteryLevel() {
-  return map(analogRead(3), 500, 715, 0, 100);
-}
+int getBatteryLevel() { return map(analogRead(3), 500, 715, 0, 100); }
 
 void setup() {
   pinMode(BUTTON_PIN, INPUT);
@@ -418,8 +384,6 @@ void setup() {
   pinMode(4, OUTPUT);
   digitalWrite(4, LOW);
   pinMode(15, INPUT);
-  if (debug)
-    Serial.begin(115200);
   wdt_enable(5000);
   blePeripheral.setLocalName("DS-D6-K");
   blePeripheral.setAdvertisingInterval(555);
@@ -444,11 +408,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(15), acclHandler, RISING);
   NRF_GPIO->PIN_CNF[15] &= ~((uint32_t)GPIO_PIN_CNF_SENSE_Msk);
   NRF_GPIO->PIN_CNF[15] |=
-    ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+      ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
   attachInterrupt(digitalPinToInterrupt(2), charge, RISING);
   NRF_GPIO->PIN_CNF[2] &= ~((uint32_t)GPIO_PIN_CNF_SENSE_Msk);
   NRF_GPIO->PIN_CNF[2] |=
-    ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+      ((uint32_t)GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
   display.begin(SSD1306_SWITCHCAPVCC);
   delay(100);
   display.clearDisplay();
@@ -489,32 +453,33 @@ void doAction() {
   /* Always display the Sandbox Game */
   if (menuIndex == SANDBOX_INDEX)
     displaySandboxGame();
+  else if (menuIndex == SNOWFLAKE_ANIMATION_INDEX)
+    displaySnowflakeAnimation();
   else if (shouldRefresh()) {
     displayRefreshTime = millis();
     switch (menuIndex) {
-      case TIME_INDEX:
-      case ACCELEROMETER_INDEX:
-        displayTime();
-        break;
-      case MAC_INDEX:
-        displayMAC();
-        break;
-      case SNOWFLAKE_INDEX:
-        displaySnowflakeStatic();
-        break;
-      case SNOWFLAKE_ANIMATION_INDEX:
-        displaySnowflakeAnimation();
-        break;
-      case BOOTLOADER_INDEX:
-        displayBootloader();
-        break;
-      case CHARGING_INDEX:
-        displayCharging();
-        break;
-      case BLE_RECEIVED_INDEX:
-        displayBleMenu();
-        break;
+    case TIME_INDEX:
+    case ACCELEROMETER_INDEX:
+      displayTime();
+      break;
+    case MAC_INDEX:
+      displayMAC();
+      break;
+    case SNOWFLAKE_INDEX:
+      displaySnowflakesStatic();
+      break;
+    case BOOTLOADER_INDEX:
+      displayBootloader();
+      break;
+    case CHARGING_INDEX:
+      displayCharging();
+      break;
+    case BLE_RECEIVED_INDEX:
+      displayBleMenu();
+      break;
     }
+  } else {
+    delay(refreshRate);
   }
 }
 
@@ -525,28 +490,28 @@ void doAction() {
 void handleButtonPress() {
   buttonPressed = false;
   switch (menuIndex) {
-    case BOOTLOADER_INDEX:
-      startbutton = millis();
-      while (!digitalRead(BUTTON_PIN)) {
-      }
-      if (millis() - startbutton > 1000) {
-        delay(100);
-        int err_code = sd_power_gpregret_set(0x01);
-        sd_nvic_SystemReset();
-        while (1) {
-        };
-      } else {
-        menuIndex = 0;
-      }
-      break;
-    case ACCELEROMETER_INDEX:
-    case CHARGING_INDEX:
-    case BLE_RECEIVED_INDEX:
+  case BOOTLOADER_INDEX:
+    startbutton = millis();
+    while (!digitalRead(BUTTON_PIN)) {
+    }
+    if (millis() - startbutton > 1000) {
+      delay(100);
+      int err_code = sd_power_gpregret_set(0x01);
+      sd_nvic_SystemReset();
+      while (1) {
+      };
+    } else {
       menuIndex = 0;
-      motorOff();
-      break;
-    default:
-      menuIndex += 1;
+    }
+    break;
+  case ACCELEROMETER_INDEX:
+  case CHARGING_INDEX:
+  case BLE_RECEIVED_INDEX:
+    menuIndex = 0;
+    motorOff();
+    break;
+  default:
+    menuIndex += 1;
   }
 }
 
@@ -554,41 +519,41 @@ void handleButtonPress() {
    `menuIndex`. */
 void powerDownIfNeeded() {
   switch (menuIndex) {
-    case TIME_INDEX:
-    case MAC_INDEX:
-      if (shouldSleep(sleepDelay)) {
-        powerDown();
-      }
-      break;
-    case SNOWFLAKE_INDEX:
-    case SNOWFLAKE_ANIMATION_INDEX:
-      if (shouldSleep(10000)) {
-        powerDown();
-      }
-      break;
-    case SANDBOX_INDEX:
-      if (shouldSleep(20000)) {
-        powerDown();
-      }
-      break;
-    case ACCELEROMETER_INDEX:
-    case CHARGING_INDEX:
-      if (shouldSleep(5000))
-        powerDown();
-      break;
-    case BLE_RECEIVED_INDEX:
-      if (shouldSleep(500)) {
-        motorOff();
-      }
-      if (shouldSleep(5000)) {
-        powerDown();
-      }
-      break;
-    default:
-      if (shouldSleep(5000)) {
-        motorOff();
-        powerDown();
-      }
+  case TIME_INDEX:
+  case MAC_INDEX:
+    if (shouldSleep(sleepDelay)) {
+      powerDown();
+    }
+    break;
+  case SNOWFLAKE_INDEX:
+  case SNOWFLAKE_ANIMATION_INDEX:
+    if (shouldSleep(10000)) {
+      powerDown();
+    }
+    break;
+  case SANDBOX_INDEX:
+    if (shouldSleep(20000)) {
+      powerDown();
+    }
+    break;
+  case ACCELEROMETER_INDEX:
+  case CHARGING_INDEX:
+    if (shouldSleep(5000))
+      powerDown();
+    break;
+  case BLE_RECEIVED_INDEX:
+    if (shouldSleep(500)) {
+      motorOff();
+    }
+    if (shouldSleep(5000)) {
+      powerDown();
+    }
+    break;
+  default:
+    if (shouldSleep(5000)) {
+      motorOff();
+      powerDown();
+    }
   }
 }
 
